@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dinai – AI Chat</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #ffffff; --bg2: #f5f5f5; --bg3: #ececec;
+      --text: #111111; --text2: #555555; --text3: #999999;
+      --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
+      --accent: #000000; --danger: #e53e3e; --success: #38a169;
+      --radius: 10px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f0f0f; --bg2: #1a1a1a; --bg3: #242424;
+        --text: #f0f0f0; --text2: #aaaaaa; --text3: #555555;
+        --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.16);
+        --accent: #ffffff;
+      }
+    }
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    #app { height: 100vh; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+
+    /* AUTH */
+    .page { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 20px; background: var(--bg); transition: opacity 0.25s, transform 0.25s; z-index: 10; overflow-y: auto; }
+    .page.hidden { opacity: 0; pointer-events: none; transform: scale(0.97); z-index: 1; }
+    .logo { width: 54px; height: 54px; border-radius: 15px; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; color: var(--bg); margin-bottom: 18px; flex-shrink: 0; }
+    .page-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+    .page-sub { font-size: 14px; color: var(--text2); margin-bottom: 26px; text-align: center; line-height: 1.5; }
+    .form { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 13px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 13px; font-weight: 500; color: var(--text2); }
+    .field input { padding: 11px 14px; border: 1px solid var(--border2); border-radius: var(--radius); font-size: 14px; font-family: inherit; background: var(--bg2); color: var(--text); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+    .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+    .field input::placeholder { color: var(--text3); }
+    .field .hint { font-size: 11px; color: var(--text3); line-height: 1.6; }
+    .field .hint a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .btn { padding: 12px; border-radius: var(--radius); border: none; background: var(--accent); color: var(--bg); font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.82; }
+    .err    { font-size: 12px; color: var(--danger);  min-height: 16px; text-align: center; }
+    .ok-msg { font-size: 12px; color: var(--success); min-height: 16px; text-align: center; }
+    .divider { display: flex; align-items: center; gap: 10px; }
+    .divider hr { flex: 1; border: none; border-top: 1px solid var(--border); }
+    .divider span { font-size: 12px; color: var(--text3); white-space: nowrap; }
+    .switch-row { font-size: 13px; color: var(--text2); text-align: center; }
+    .switch-row button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 13px; font-family: inherit; padding: 0; font-weight: 600; }
+
+    /* CHAT */
+    #chatPage { position: absolute; inset: 0; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+    #chatPage.visible { opacity: 1; pointer-events: all; }
+    #chatHeader { padding: 13px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; background: var(--bg); flex-shrink: 0; }
+    .h-logo { width: 28px; height: 28px; border-radius: 8px; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: var(--bg); flex-shrink: 0; }
+    .chat-name { font-size: 16px; font-weight: 600; flex: 1; }
+    .model-pill { font-size: 11px; color: var(--text3); background: var(--bg2); padding: 3px 9px; border-radius: 20px; border: 1px solid var(--border); }
+    .badge { font-size: 12px; color: var(--text2); background: var(--bg2); padding: 4px 11px; border-radius: 20px; border: 1px solid var(--border); }
+    .logout-btn { font-size: 13px; color: var(--text2); background: none; border: 1px solid var(--border); padding: 5px 12px; border-radius: var(--radius); cursor: pointer; font-family: inherit; transition: background 0.15s; }
+    .logout-btn:hover { background: var(--bg2); }
+    #messages { flex: 1; overflow-y: auto; padding: 20px 18px; display: flex; flex-direction: column; gap: 16px; }
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+    .msg { display: flex; gap: 10px; align-items: flex-start; max-width: 82%; }
+    .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+    .av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+    .av.ai   { background: var(--accent); color: var(--bg); }
+    .av.user { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); }
+    .bubble { padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.65; }
+    .msg.ai   .bubble { background: var(--bg2); border: 1px solid var(--border); border-top-left-radius: 4px; }
+    .msg.user .bubble { background: var(--accent); color: var(--bg); border-top-right-radius: 4px; }
+    .typing span { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text2); margin: 0 2px; animation: blink 1.2s infinite; }
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
+    #inputRow { padding: 13px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: flex-end; background: var(--bg); flex-shrink: 0; }
+    #userInput { flex: 1; border: 1px solid var(--border2); border-radius: var(--radius); padding: 10px 14px; font-size: 14px; font-family: inherit; resize: none; min-height: 44px; max-height: 120px; background: var(--bg2); color: var(--text); outline: none; line-height: 1.5; transition: border-color 0.15s; }
+    #userInput:focus { border-color: var(--accent); }
+    #userInput::placeholder { color: var(--text3); }
+    #sendBtn { width: 42px; height: 42px; border-radius: 50%; border: none; background: var(--accent); color: var(--bg); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: opacity 0.15s; }
+    #sendBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+    @media (max-width: 480px) { .model-pill { display: none; } }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SIGN UP -->
+  <div class="page" id="signupPage">
+    <div class="logo">D</div>
+    <div class="page-title">Create your account</div>
+    <div class="page-sub">Join Dinai </div>
+    <div class="form">
+      <div class="field"><label>Full name</label><input type="text" id="su-name" placeholder="Your full name" autocomplete="name"/></div>
+      <div class="field"><label>Username</label><input type="text" id="su-user" placeholder="Choose a username" autocomplete="username"/></div>
+      <div class="field"><label>Password</label><input type="password" id="su-pass" placeholder="Min 6 characters" autocomplete="new-password"/></div>
+      <div class="field"><label>Confirm password</label><input type="password" id="su-pass2" placeholder="Re-enter password" autocomplete="new-password"/></div>
+      <div class="divider"><hr/><span>Grok API Key</span><hr/></div>
+      <div class="field">
+        <label>API Key</label>
+        <input type="password" id="su-key" placeholder="xai-..." autocomplete="off" onkeydown="if(event.key==='Enter')doSignup()"/>
+        <span class="hint">
+          Get your free key → <a href="https://console.x.ai" target="_blank" rel="noopener">console.x.ai</a>
+          → Sign up → API Keys → Create API Key
+        </span>
+      </div>
+      <div class="err" id="su-err"></div>
+      <button class="btn" onclick="doSignup()">Create account</button>
+      <div class="switch-row">Already have an account? <button onclick="showPage('loginPage')">Sign in</button></div>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div class="page hidden" id="loginPage">
+    <div class="logo">D</div>
+    <div class="page-title">Welcome back</div>
+    <div class="page-sub">Sign in to continue with Dinai</div>
+    <div class="form">
+      <div class="field"><label>Username</label><input type="text" id="li-user" placeholder="Your username" autocomplete="username"/></div>
+      <div class="field"><label>Password</label><input type="password" id="li-pass" placeholder="Your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+      <div class="err"    id="li-err"></div>
+      <div class="ok-msg" id="li-ok"></div>
+      <button class="btn" onclick="doLogin()">Sign in</button>
+      <div class="switch-row">Don't have an account? <button onclick="showPage('signupPage')">Sign up</button></div>
+    </div>
+  </div>
+
+  <!-- CHAT -->
+  <div id="chatPage">
+    <div id="chatHeader">
+      <div class="h-logo">D</div>
+      <span class="chat-name">Dinai</span>
+      <span class="model-pill">grok-3-mini</span>
+      <span class="badge" id="userBadge"></span>
+      <button class="logout-btn" onclick="doLogout()">Logout</button>
+    </div>
+    <div id="messages"></div>
+    <div id="inputRow">
+      <textarea id="userInput" placeholder="Ask Dinai anything…" rows="1" onkeydown="handleKey(event)"></textarea>
+      <button id="sendBtn" onclick="sendMessage()" aria-label="Send">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+<script>
+  let users = JSON.parse(localStorage.getItem('dinai_users') || '{}');
+  let currentUser = null, chatHistory = [], busy = false;
+
+  function saveUsers() { localStorage.setItem('dinai_users', JSON.stringify(users)); }
+
+  function showPage(id) {
+    ['signupPage','loginPage'].forEach(p =>
+      document.getElementById(p).classList.toggle('hidden', p !== id));
+  }
+
+  function doSignup() {
+    const name  = document.getElementById('su-name').value.trim();
+    const uname = document.getElementById('su-user').value.trim().toLowerCase();
+    const pass  = document.getElementById('su-pass').value;
+    const pass2 = document.getElementById('su-pass2').value;
+    const key   = document.getElementById('su-key').value.trim();
+    const err   = document.getElementById('su-err');
+
+    if (!name)                        { err.textContent = 'Please enter your full name.'; return; }
+    if (uname.length < 3)             { err.textContent = 'Username must be at least 3 characters.'; return; }
+    if (!/^[a-z0-9_]+$/.test(uname)) { err.textContent = 'Username: letters, numbers, underscore only.'; return; }
+    if (users[uname])                 { err.textContent = 'Username already taken.'; return; }
+    if (pass.length < 6)              { err.textContent = 'Password must be at least 6 characters.'; return; }
+    if (pass !== pass2)               { err.textContent = 'Passwords do not match.'; return; }
+    if (!key)                         { err.textContent = 'Please enter your Grok API key.'; return; }
+    if (!key.startsWith('xai-'))      { err.textContent = 'Grok API keys start with xai-'; return; }
+
+    users[uname] = { name, password: pass, key };
+    saveUsers();
+    err.textContent = '';
+    ['su-name','su-user','su-pass','su-pass2','su-key'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('li-user').value = uname;
+    document.getElementById('li-ok').textContent  = 'Account created! You can now sign in.';
+    document.getElementById('li-err').textContent = '';
+    showPage('loginPage');
+  }
+
+  function doLogin() {
+    const uname = document.getElementById('li-user').value.trim().toLowerCase();
+    const pass  = document.getElementById('li-pass').value;
+    const err   = document.getElementById('li-err');
+    if (!uname || !pass)                { err.textContent = 'Please fill in all fields.'; return; }
+    if (!users[uname])                  { err.textContent = 'No account found with that username.'; return; }
+    if (users[uname].password !== pass) { err.textContent = 'Incorrect password.'; return; }
+    err.textContent = '';
+    document.getElementById('li-ok').textContent = '';
+    document.getElementById('li-pass').value = '';
+    currentUser = uname; chatHistory = [];
+    document.getElementById('userBadge').textContent = users[uname].name;
+    document.getElementById('loginPage').classList.add('hidden');
+    document.getElementById('chatPage').classList.add('visible');
+    document.getElementById('messages').innerHTML = '';
+    addBubble('ai', `Hi ${users[uname].name}! I'm Dinai, powered by Grok AI. What would you like to explore today?`);
+    document.getElementById('userInput').focus();
+  }
+
+  function doLogout() {
+    currentUser = null; chatHistory = [];
+    document.getElementById('chatPage').classList.remove('visible');
+    document.getElementById('li-err').textContent = '';
+    document.getElementById('li-ok').textContent  = '';
+    showPage('loginPage');
+  }
+
+  function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+
+  document.getElementById('userInput').addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+
+  function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+  function addBubble(role, text) {
+    const msgs = document.getElementById('messages');
+    const d = document.createElement('div');
+    d.className = 'msg ' + role;
+    const label = role === 'user' ? (currentUser ? currentUser[0].toUpperCase() : 'U') : 'D';
+    d.innerHTML = `<div class="av ${role}">${label}</div><div class="bubble">${esc(text)}</div>`;
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function showTyping() {
+    const msgs = document.getElementById('messages');
+    const d = document.createElement('div');
+    d.className = 'msg ai'; d.id = 'typing';
+    d.innerHTML = `<div class="av ai">D</div><div class="bubble typing"><span></span><span></span><span></span></div>`;
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function hideTyping() { const el = document.getElementById('typing'); if (el) el.remove(); }
+
+  async function sendMessage() {
+    if (busy || !currentUser) return;
+    const inp = document.getElementById('userInput');
+    const text = inp.value.trim();
+    if (!text) return;
+    inp.value = ''; inp.style.height = 'auto';
+    busy = true;
+    document.getElementById('sendBtn').disabled = true;
+    addBubble('user', text);
+    chatHistory.push({ role: 'user', content: text });
+    showTyping();
+    try {
+      const res = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${users[currentUser].key}`
+        },
+        body: JSON.stringify({
+          model: 'grok-3-mini',
+          messages: chatHistory,
+          max_tokens: 1024
+        })
+      });
+      const data = await res.json();
+      hideTyping();
+      if (data.error) {
+        addBubble('ai', 'Error: ' + data.error.message);
+      } else {
+        const reply = data.choices[0].message.content;
+        chatHistory.push({ role: 'assistant', content: reply });
+        addBubble('ai', reply);
+      }
+    } catch (e) {
+      hideTyping();
+      addBubble('ai', 'Network error: ' + e.message);
+    }
+    busy = false;
+    document.getElementById('sendBtn').disabled = false;
+    inp.focus();
+  }
+</script>
+</body>
+</html>
